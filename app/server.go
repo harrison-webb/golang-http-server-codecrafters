@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -12,6 +13,7 @@ func main() {
 
 	// Uncomment this block to pass the first stage
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
+	fmt.Println("Server listening on port 4221")
 	if err != nil {
 		fmt.Println("Failed to bind to port 4221")
 		os.Exit(1)
@@ -22,9 +24,29 @@ func main() {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
 	}
+	fmt.Println("connection established with client")
 
-	var data []byte
-	connection.Read(data)
-	connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	buf := make([]byte, 2048)
+	numBytes, err := connection.Read(buf)
+	if err != nil {
+		fmt.Println("Error reading from connection: ", err.Error())
+		os.Exit(1)
+	}
+	fmt.Printf("Read %d bytes from client", numBytes)
 
+	path := extractPath(buf)
+
+	if path == "/" {
+		connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	} else {
+		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	}
+
+}
+
+func extractPath(request []byte) string {
+	requestString := string(request[:])
+	requestChunked := strings.Split(requestString, " ")
+	path := requestChunked[1]
+	return path
 }

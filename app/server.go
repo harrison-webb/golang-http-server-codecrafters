@@ -38,6 +38,12 @@ func main() {
 
 	if path == "/" {
 		connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	} else if strings.HasPrefix(path, "/echo") {
+		echoValue := path[6:]
+		fmt.Println(echoValue)
+		payload := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(echoValue), echoValue)
+		fmt.Println(payload)
+		connection.Write([]byte(payload))
 	} else {
 		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}

@@ -17,8 +17,6 @@ type request struct {
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	fmt.Println("Logs from your program will appear here!")
-
-	// Uncomment this block to pass the first stage
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	fmt.Println("Server listening on port 4221")
 	if err != nil {
@@ -26,14 +24,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	connection, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
-	}
+	for {
+		connection, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
 
+		go handleConnection(connection)
+	}
+}
+
+func handleConnection(connection net.Conn) {
 	buf := make([]byte, 2048)
-	_, err = connection.Read(buf)
+	_, err := connection.Read(buf)
 	if err != nil {
 		fmt.Println("Error reading from connection: ", err.Error())
 		os.Exit(1)

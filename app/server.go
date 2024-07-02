@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -52,6 +53,16 @@ func handleConnection(connection net.Conn, filepath string) {
 
 	request := parseRequest(buf)
 
+	if request.verb == "GET" {
+		processGet(request, connection, filepath)
+	} else if request.verb == "POST" {
+		processPost(request, connection, filepath)
+	} else {
+		fmt.Printf("error: %v\n", "verb not implemented")
+	}
+}
+
+func processGet(request request, connection net.Conn, filepath string) {
 	path := request.path
 
 	if path == "/" {
@@ -83,12 +94,32 @@ func handleConnection(connection net.Conn, filepath string) {
 
 }
 
+func processPost(request request, connection net.Conn, filepath string) {
+	path := request.path // e.x. /files/myfile
+
+	if strings.HasPrefix(path, "/files") {
+		filename := strings.Split(path, "/")[2]
+		fileLocation := fmt.Sprintf("%s%s", filepath, filename)
+		// create and write request body to file
+		f, err := os.Create(fileLocation)
+		if err != nil {
+			panic(err)
+		}
+		_, err = f.WriteString(strings.TrimSpace(request.body))
+		if err != nil {
+			panic(err)
+		}
+
+		connection.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
+	}
+}
+
 func parseRequest(buf []byte) request {
 	requestString := string(buf[:])
 	requestChunks := strings.Split(requestString, " ")
 	verb := requestChunks[0]
 	path := requestChunks[1]
-	body := strings.Split(requestString, "\r\n\r\n")[1]
+	var body string
 
 	headersStart := strings.Index(requestString, "\r\n") + 4 // headers start just after the first \r\n
 	headersEnd := strings.Index(requestString, "\r\n\r\n")
@@ -105,6 +136,17 @@ func parseRequest(buf []byte) request {
 		value = strings.TrimSpace(value)
 		fmt.Printf("Key: %s, Value: %s", key, value)
 		headers[key] = value
+	}
+
+	val, ok := headers["Content-Length"]
+	if ok {
+		len, err := strconv.Atoi(val)
+		if err != nil {
+			panic(err)
+		}
+		body = strings.Split(requestString, "\r\n\r\n")[1][:len]
+	} else {
+		body = strings.Split(requestString, "\r\n\r\n")[1]
 	}
 
 	return request{verb: verb, path: path, headers: headers, body: body}

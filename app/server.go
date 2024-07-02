@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -16,7 +17,11 @@ type request struct {
 
 func main() {
 	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
+	filepathPtr := flag.String("directory", "", "")
+	flag.Parse()
+
+	filepath := *filepathPtr
+
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	fmt.Println("Server listening on port 4221")
 	if err != nil {
@@ -31,11 +36,13 @@ func main() {
 			os.Exit(1)
 		}
 
-		go handleConnection(connection)
+		go handleConnection(connection, filepath)
 	}
 }
 
-func handleConnection(connection net.Conn) {
+func handleConnection(connection net.Conn, filepath string) {
+	defer connection.Close()
+
 	buf := make([]byte, 2048)
 	_, err := connection.Read(buf)
 	if err != nil {
@@ -59,6 +66,17 @@ func handleConnection(connection net.Conn) {
 		headerVal := request.headers["User-Agent"]
 		payload := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(headerVal), headerVal)
 		connection.Write([]byte(payload))
+	} else if strings.HasPrefix(path, "/files") {
+		filename := strings.Split(path, "/")[2]
+		fileLocation := fmt.Sprintf("%s%s", filepath, filename)
+		fileContent, err := os.ReadFile(fileLocation)
+		if err != nil {
+			// file does not exist
+			connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		} else {
+			payload := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(fileContent), fileContent)
+			connection.Write([]byte(payload))
+		}
 	} else {
 		connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}

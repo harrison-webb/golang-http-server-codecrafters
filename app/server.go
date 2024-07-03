@@ -149,12 +149,16 @@ func processGet(request request, connection net.Conn, filepath string) {
 	}
 
 	val, ok := request.headers["Accept-Encoding"]
-	if ok && val == "gzip" {
-		response.headers["Content-Encoding"] = "gzip"
+	if ok {
+		encodings := strings.Split(val, ", ")
+		for _, element := range encodings {
+			if element == "gzip" {
+				response.headers["Content-Encoding"] = "gzip"
+			}
+		}
 	}
 
 	connection.Write([]byte(responseToString(response)))
-
 }
 
 func processPost(request request, connection net.Conn, filepath string) {
@@ -205,7 +209,7 @@ func parseRequest(buf []byte) request {
 		key := strings.Split(pair, ":")[0]
 		value := strings.Split(pair, ":")[1]
 		value = strings.TrimSpace(value)
-		fmt.Printf("Key: %s, Value: %s", key, value)
+		// fmt.Printf("Key: %s, Value: %s", key, value)
 		headers[key] = value
 	}
 

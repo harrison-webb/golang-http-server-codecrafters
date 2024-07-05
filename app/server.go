@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"net"
@@ -131,15 +130,9 @@ func processGet(request request, connection net.Conn, filepath string) {
 
 		if response.headers["Content-Encoding"] == "gzip" {
 			// gzip compress "echoValue" then set Content-Length to len(gzip(echoValue))
-			var b bytes.Buffer
-			gz := gzip.NewWriter(&b)
-			if _, err := gz.Write([]byte(echoValue)); err != nil {
-				panic(err)
-			}
-			if err := gz.Close(); err != nil {
-				panic(err)
-			}
-			gzipEncodedString := base64.StdEncoding.EncodeToString(b.Bytes())
+			fmt.Println("Compressing")
+			// gzipEncodedString := base64.StdEncoding.EncodeToString(b.Bytes())
+			gzipEncodedString := compress(echoValue)
 			response.headers["Content-Length"] = strconv.Itoa(len(gzipEncodedString))
 			response.body = gzipEncodedString
 		} else {
@@ -176,6 +169,8 @@ func processGet(request request, connection net.Conn, filepath string) {
 		response.code = "404"
 		// connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
+
+	fmt.Println(responseToString(response))
 
 	connection.Write([]byte(responseToString(response)))
 }
@@ -244,4 +239,27 @@ func parseRequest(buf []byte) request {
 	}
 
 	return request{verb: verb, path: path, headers: headers, body: body}
+}
+
+func compress(s string) string {
+	fmt.Printf("String being compressed: ''%s''", s)
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	payload := []byte(s)
+	fmt.Println(fmt.Sprintf("%x", payload))
+	if _, err := gz.Write(payload); err != nil {
+		panic(err)
+	}
+
+	if err := gz.Flush(); err != nil {
+		panic(err)
+	}
+
+	if err := gz.Close(); err != nil {
+		panic(err)
+	}
+
+	fmt.Println(fmt.Sprintf("%x", b.Bytes()))
+
+	return b.String()
 }

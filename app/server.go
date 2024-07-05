@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"net"
@@ -106,6 +109,16 @@ func processGet(request request, connection net.Conn, filepath string) {
 		body:    "",
 	}
 
+	val, ok := request.headers["Accept-Encoding"]
+	if ok {
+		encodings := strings.Split(val, ", ")
+		for _, element := range encodings {
+			if element == "gzip" {
+				response.headers["Content-Encoding"] = "gzip"
+			}
+		}
+	}
+
 	path := request.path
 
 	if path == "/" {
@@ -115,8 +128,24 @@ func processGet(request request, connection net.Conn, filepath string) {
 		response.code = "200"
 		echoValue := path[6:]
 		response.headers["Content-Type"] = "text/plain"
-		response.headers["Content-Length"] = strconv.Itoa(len(echoValue))
-		response.body = echoValue
+
+		if response.headers["Content-Encoding"] == "gzip" {
+			// gzip compress "echoValue" then set Content-Length to len(gzip(echoValue))
+			var b bytes.Buffer
+			gz := gzip.NewWriter(&b)
+			if _, err := gz.Write([]byte(echoValue)); err != nil {
+				panic(err)
+			}
+			if err := gz.Close(); err != nil {
+				panic(err)
+			}
+			gzipEncodedString := base64.StdEncoding.EncodeToString(b.Bytes())
+			response.headers["Content-Length"] = strconv.Itoa(len(gzipEncodedString))
+			response.body = gzipEncodedString
+		} else {
+			response.headers["Content-Length"] = strconv.Itoa(len(echoValue))
+			response.body = echoValue
+		}
 		// payload := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(echoValue), echoValue)
 		// connection.Write([]byte(payload))
 	} else if path == "/user-agent" {
@@ -146,16 +175,6 @@ func processGet(request request, connection net.Conn, filepath string) {
 	} else {
 		response.code = "404"
 		// connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-	}
-
-	val, ok := request.headers["Accept-Encoding"]
-	if ok {
-		encodings := strings.Split(val, ", ")
-		for _, element := range encodings {
-			if element == "gzip" {
-				response.headers["Content-Encoding"] = "gzip"
-			}
-		}
 	}
 
 	connection.Write([]byte(responseToString(response)))

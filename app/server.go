@@ -24,37 +24,6 @@ type response struct {
 	body    []byte
 }
 
-// func responseToString(response response) string {
-// 	var sb strings.Builder
-//
-// 	var statusLine string
-// 	switch response.code {
-// 	case "200":
-// 		statusLine = "HTTP/1.1 200 OK"
-// 	case "201":
-// 		statusLine = "HTTP/1.1 201 Created"
-// 	case "404":
-// 		statusLine = "HTTP/1.1 404 Not Found"
-// 	}
-//
-// 	sb.WriteString(statusLine)
-// 	sb.WriteString("\r\n")
-//
-// 	// convert headers to string
-// 	for k, v := range response.headers {
-// 		sb.WriteString(k)
-// 		sb.WriteString(": ")
-// 		sb.WriteString(v)
-// 		sb.WriteString("\r\n")
-// 	}
-//
-// 	sb.WriteString("\r\n")
-//
-// 	sb.WriteString(response.body)
-//
-// 	return sb.String()
-// }
-
 func printResponseBytes(response response) []byte {
 	result := make([]byte, 0)
 
@@ -85,7 +54,6 @@ func printResponseBytes(response response) []byte {
 }
 
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
 	filepathPtr := flag.String("directory", "", "")
 	flag.Parse()
 
@@ -151,16 +119,13 @@ func processGet(request request, connection net.Conn, filepath string) {
 
 	if bytes.Equal(path, []byte("/")) {
 		response.code = []byte("200")
-		// connection.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 	} else if bytes.HasPrefix(path, []byte("/echo")) {
 		response.code = []byte("200")
 		echoValue := path[6:]
 		response.headers["Content-Type"] = []byte("text/plain")
 
 		if bytes.Equal(response.headers["Content-Encoding"], []byte("gzip")) {
-			// gzip compress "echoValue" then set Content-Length to len(gzip(echoValue))
 			fmt.Println("Compressing")
-			// gzipEncodedBytes := base64.StdEncoding.EncodeToString(b.Bytes())
 			gzipEncodedBytes, length := Compress(echoValue)
 			response.headers["Content-Length"] = []byte(strconv.Itoa(length))
 			response.body = gzipEncodedBytes
@@ -168,27 +133,20 @@ func processGet(request request, connection net.Conn, filepath string) {
 			response.headers["Content-Length"] = []byte(strconv.Itoa(len(echoValue)))
 			response.body = echoValue
 		}
-		// payload := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(echoValue), echoValue)
-		// connection.Write([]byte(payload))
 	} else if bytes.Equal(path, []byte("/user-agent")) {
 		response.code = []byte("200")
 		headerVal := request.headers["User-Agent"]
 		response.headers["Content-Type"] = []byte("text/plain")
 		response.headers["Content-Length"] = []byte(strconv.Itoa(len(headerVal)))
 		response.body = headerVal
-		// payload := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(headerVal), headerVal)
-		// connection.Write([]byte(payload))
 	} else if bytes.HasPrefix(path, []byte("/files")) {
 		filename := bytes.Split(path, []byte("/"))[2]
 		fileLocation := fmt.Sprintf("%s%s", filepath, filename)
 		fileContent, err := os.ReadFile(fileLocation)
 		if err != nil {
 			// file does not exist
-			// connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 			response.code = []byte("404")
 		} else {
-			// payload := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s", len(fileContent), fileContent)
-			// connection.Write([]byte(payload))
 			response.code = []byte("200")
 			response.headers["Content-Type"] = []byte("application/octet-stream")
 			response.headers["Content-Length"] = []byte(strconv.Itoa(len(fileContent)))
@@ -196,10 +154,7 @@ func processGet(request request, connection net.Conn, filepath string) {
 		}
 	} else {
 		response.code = []byte("404")
-		// connection.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 	}
-
-	// fmt.Println(responseToString(response))
 
 	connection.Write(printResponseBytes(response))
 }
@@ -226,23 +181,19 @@ func processPost(request request, connection net.Conn, filepath string) {
 			panic(err)
 		}
 
-		// connection.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
 		response.code = []byte("201")
 		connection.Write(printResponseBytes(response))
 	}
 }
 
 func parseRequest(req []byte) request {
-	// requestString := string(buf[:])
-	// requestChunks := strings.Split(requestString, " ")
 	requestChunks := bytes.Split(req, []byte(" "))
 	verb := requestChunks[0]
 	path := requestChunks[1]
 
 	var body []byte
 
-	// headersStart := strings.Index(requestString, "\r\n") + 4 // headers start just after the first \r\n
-	headersStart := bytes.Index(req, []byte("\r\n")) + 2
+	headersStart := bytes.Index(req, []byte("\r\n")) + 2 // +2 because \r and \n are each a single character
 	headersEnd := bytes.Index(req, []byte("\r\n\r\n"))
 
 	// header format:
@@ -250,14 +201,11 @@ func parseRequest(req []byte) request {
 	//		header2: value2\r\n
 	//		...
 	headersRaw := req[headersStart:headersEnd] // this is the section of the req byte array with the headers in it
-	fmt.Printf("DEBUG: headersRaw\n%s<DONE>", string(headersRaw[:]))
 	headers := make(map[string][]byte)
 	for _, pair := range bytes.Split(headersRaw, []byte("\r\n")) { // split "header section" string on \r\n and iterate over each line
 		key := bytes.Split(pair, []byte(":"))[0]
 		value := bytes.Split(pair, []byte(":"))[1]
-		// value = strings.TrimSpace(value)
 		value = bytes.TrimSpace(value)
-		// fmt.Printf("Key: %s, Value: %s", key, value)
 		keyToString := string(key[:])
 		headers[keyToString] = value
 	}

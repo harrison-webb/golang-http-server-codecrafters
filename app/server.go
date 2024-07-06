@@ -238,10 +238,11 @@ func parseRequest(req []byte) request {
 	requestChunks := bytes.Split(req, []byte(" "))
 	verb := requestChunks[0]
 	path := requestChunks[1]
+
 	var body []byte
 
 	// headersStart := strings.Index(requestString, "\r\n") + 4 // headers start just after the first \r\n
-	headersStart := bytes.Index(req, []byte("r\n")) + 4
+	headersStart := bytes.Index(req, []byte("\r\n")) + 2
 	headersEnd := bytes.Index(req, []byte("\r\n\r\n"))
 
 	// header format:
@@ -249,6 +250,7 @@ func parseRequest(req []byte) request {
 	//		header2: value2\r\n
 	//		...
 	headersRaw := req[headersStart:headersEnd] // this is the section of the req byte array with the headers in it
+	fmt.Printf("DEBUG: headersRaw\n%s<DONE>", string(headersRaw[:]))
 	headers := make(map[string][]byte)
 	for _, pair := range bytes.Split(headersRaw, []byte("\r\n")) { // split "header section" string on \r\n and iterate over each line
 		key := bytes.Split(pair, []byte(":"))[0]
